@@ -1,0 +1,10 @@
+export const API_BASE_URL = 'https://api.staging.payk12.com/';
+// export const API_BASE_URL = 'https://api.payk12.com/';
+export const IDP_BASE_URL = 'https://api.staging.payk12.com/';
+export const SIGNALR_ENDPOINT = 'https://payk12.service.signalr.net';
+//export const SIGNALR_ENDPOINT = 'Endpoint=https://payk12.service.signalr.net;AccessKey=h0KlGr0CWiDlnAjcSTE528NaQvZolkhqrxKm5lo0pas=;Version=1.0;';
+export const WEBSITE_URL = 'https://secure.payk12.com';
+export const SCHOOL_URL = 'https://secure.payk12.com/school/{0}/{1}';
+export const IDP_REDIRECT_URL = 'com.payk12.ticketclient:/oauthredirect';
+export const IDP_CLIENT_ID = 'native.code';
+export const IDP_SCOPES = 'openid,profile,tickets,email,IdentityServerApi';
