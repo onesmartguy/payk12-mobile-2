@@ -1,37 +1,31 @@
-import React, {
-  memo,
-  useEffect,
-  useRef,
-  useState,
-} from 'react';
-import { ActivityIndicator, TouchableOpacity } from 'react-native';
-import moment from 'moment';
-import { FlatList } from 'react-native-gesture-handler';
+import { EventModel, TicketModel } from "@/common/types";
+import useTicketCheckIn, { CheckInTicket } from "../hooks/useTicketCheckIn";
+import { format, isValid, parseISO } from "date-fns";
+import { useEffect, useRef, useState } from "react";
+import { ActivityIndicator, FlatList, TouchableOpacity } from "react-native";
+import Box from "@/common/components/Box";
+import TextView from "@/common/components/TextView";
+import LoadingBlock from "@/common/components/LoadingBlock";
+import Button from "@/common/components/Button";
+import { CheckInErrorLogSheet } from "../sheets";
+import useSessionStore from "@/auth/stores/useSessionStore";
+import SearchBox from "@/common/components/SearchBox";
+import { useRouter } from "expo-router";
+import { useRedemptionHub } from "../hooks/useRedemptionHub";
 
-import { Button, Text, Box, SearchBox, LoadingBlock } from '../../../ui';
-import { MainLayout } from '../../../components';
-import { Event, Ticket } from '../../common/types';
-import { useAppContext } from '../../auth/authSlice';
-import { CheckInErrorLogSheet } from '../sheets';
-import { CheckInTicket, useTicketCheckIn } from '../hooks/useTicketCheckIn';
-import { DrawerScreenProps } from '@react-navigation/drawer';
-import { StackParamList } from '@app/navigation';
-import { useCurrentUser } from '@app/features/auth/authSlice';
-import { useRedemptionHub } from '@app/hooks/useRedemptionHub';
-import { useQueryClient } from '@tanstack/react-query';
 
-type Props = DrawerScreenProps<StackParamList, 'EventTicketList'>;
+
 const TicketRow = 
   ({
     ticket,
     showLoader = false,
     onPress,
   }: {
-    ticket: Ticket;
+    ticket: TicketModel;
     showLoader?: boolean;
     onPress?: (t: CheckInTicket) => any;
   }) => {
-    const dte = moment(moment.utc(ticket.redeemedOn).toDate());
+    const dte = parseISO(ticket.redeemedOn?.getUTCDate().toString()!);
     const details =
       ticket.section && ticket.seat
         ? `Sect: ${ticket.section} Row: ${ticket.row}  Seat: ${ticket.seat}`
@@ -49,7 +43,7 @@ const TicketRow =
       }
     };
     const ticketNumber =
-      ticket.formattedNumber || ticket.ticketNumber || ticket.passNumber;
+      ticket.formattedCode || ticket.code || ticket.passNumber;
     return (
       <TouchableOpacity>
         <Box
@@ -59,20 +53,20 @@ const TicketRow =
         >
           <Box flex={1} flexDirection="row">
             <Box flex={3}>
-              <Text variant="rowBlack">{ticket.ownerName}</Text>
+              <TextView variant="rowBlack">{ticket.ownerName}</TextView>
               {ticket.type === 'P' && (
-                <Text variant="rowDetailsBlue" marginTop="xs">
+                <TextView variant="rowDetailsBlue" marginTop="xs">
                   {`Pass #${ticketNumber}`}
-                </Text>
+                </TextView>
               )}
               {ticket.type !== 'P' && (
-                <Text variant="rowDetailsBlue" marginTop="xs">
+                <TextView variant="rowDetailsBlue" marginTop="xs">
                   {`Ticket #${ticketNumber}`}
-                </Text>
+                </TextView>
               )}
-              <Text variant="rowDetails" marginTop="xs">
+              <TextView variant="rowDetails" marginTop="xs">
                 {details}
-              </Text>
+              </TextView>
             </Box>
             <Box flex={2}>
               {loading && <LoadingBlock />}
@@ -83,51 +77,42 @@ const TicketRow =
                   borderRadius={8}
                   paddingHorizontal="xxs"
                   fontSize={12}
-                  disabled={dte.isValid()}
+                  disabled={isValid(dte)}
                   onPress={() => handleOnPress()}
                 />
               )}
             </Box>
           </Box>
-          {dte.isValid() && (
-            <Text variant="rowDetails" fontWeight="600" marginTop="xs">
-              {`Checked in: ${dte.format(
-                'MM/DD/YY'
-              )} at ${dte.format('h:mm A')}`}
-            </Text>
+          {isValid(dte) && (
+            <TextView variant="rowDetails" fontWeight="600" marginTop="xs">
+              {`Checked in: ${format(dte,'MM/dd/yy')} at ${format(dte, 'h:mm A')}`}
+            </TextView>
           )}
         </Box>
       </TouchableOpacity>
     );
   };
-export const AdminEventTicketListScreen: React.FC<Props> = ({
-  route,
-  navigation,
+export const AdminEventTicketListScreen: React.FC<{events: EventModel[]}> = ({events
 }) => {
-  const events = route.params?.events ?? []
-  
+ 
+  const router = useRouter();
   const [eventTime, setEventTime] = useState('');
   const [filter, setFilter] = useState('');
   const {
-    isUpdating,
     redeemTicket,
     tickets,
     clearErrors,
     errors,
     refetch,
-    isLoading,
     isFetching,
   } = useTicketCheckIn(events);
   const currentEvent = events[0]
-  const { id } = useCurrentUser()
-  const queryClient = useQueryClient()
-  const { receiveMessageEvent, ticketRedeemedEvent } = useRedemptionHub({userId: id, eventId: events.map(x=>x.id)}, [id])
+  const userId = useSessionStore(x => x.user!.id)
+  const { receiveMessageEvent, ticketRedeemedEvent } = useRedemptionHub({userId: userId, eventId: events.map(x=>x.id)}, [userId])
   const bottomSheetRef = useRef<CheckInErrorLogSheet>(null);
   useEffect(() => {
     if (currentEvent) {
-      const et = moment(currentEvent.startTime).format(
-        'MM/DD/YY - dddd - h:mm A'
-      );
+      const et = format(currentEvent.startTime, 'MM/dd/yy - dddd - h:mm A');
       setEventTime(et);
     } else {
     }
@@ -139,13 +124,12 @@ export const AdminEventTicketListScreen: React.FC<Props> = ({
   }, [errors]);
 
   const searchText = filter.toLowerCase();
-  const filteredTickets = tickets.filter(
-    (x) =>
+  const filteredTickets = tickets.filter(x =>
       x.name?.toLowerCase().includes(searchText) ||
       x.ownerEmail.toLowerCase().includes(searchText) ||
       x.ownerName.toLowerCase().includes(searchText) ||
-      x.ticketNumber.toLowerCase().includes(searchText) ||
-      (x.formattedNumber || '').toLowerCase().includes(searchText) ||
+      x.code.toLowerCase().includes(searchText) ||
+      (x.formattedCode || '').toLowerCase().includes(searchText) ||
       `${x.section}:${x.row}:${x.seat}`.toLowerCase().includes(searchText)
   );
 
@@ -154,17 +138,17 @@ export const AdminEventTicketListScreen: React.FC<Props> = ({
   const SearchHeader = () =>
   searchText ? (
     <Box backgroundColor='blueGrayBackground'>
-      <Text textAlign='center' paddingVertical='xs'>{filteredTickets.length} ticket(s) found</Text>
+      <TextView textAlign='center' paddingVertical='xs'>{filteredTickets.length} ticket(s) found</TextView>
     </Box>
   ) : null;
 
   const renderContent = () => {
 
-    if (isLoading)
+    if (isFetching)
       return (
         <Box flex={1} justifyContent="center" alignItems="center">
           <ActivityIndicator />
-          <Text variant="loading">Loading</Text>
+          <TextView variant="loading">Loading</TextView>
         </Box>
       );
 
@@ -191,31 +175,26 @@ export const AdminEventTicketListScreen: React.FC<Props> = ({
   };
 
   return (
-    <MainLayout
-      showHeader
-      headerOptions={{
-        onBackPress: () => navigation.goBack(),
-      }}
-    >
+    
       <Box paddingHorizontal="lg" flex={1}>
         <Box>
           <Box alignItems="center" justifyContent="center">
-            <Text
+            <TextView
               variant="header"
               marginBottom="m"
               fontSize={18}
               style={{ textAlign: 'center' }}
             >
               {currentEvent.name}
-            </Text>
-            <Text>{eventTime}</Text>
+            </TextView>
+            <TextView>{eventTime}</TextView>
           </Box>
 
           <Button
             variant="primary"
             borderRadius={14}
             label="Switch To Scanning Mode"
-            onPress={() => navigation.goBack()}
+            onPress={() => router.back()}
           />
           <SearchBox
             onChange={(value) => setFilter(value)}
@@ -224,15 +203,15 @@ export const AdminEventTicketListScreen: React.FC<Props> = ({
           />
         </Box>
         <Box flexGrow={1}>{renderContent()}</Box>
-      </Box>
-      {/* {errors && (
+              {/* {errors && (
         <CheckInErrorLogBottomSheet
           ref={bottomSheetModalRef}
           errors={errors}
           onClose={() => clearErrors()}
         />
       )} */}
-    </MainLayout>
+      </Box>
+
   );
 };
 

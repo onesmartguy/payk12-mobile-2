@@ -1,0 +1,72 @@
+name: EAS Build and Deploy
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    # Step 1: Checkout code
+    - name: Checkout code
+      uses: actions/checkout@v2
+
+    # Step 2: Setup Node.js
+    - name: Set up Node.js
+      uses: actions/setup-node@v2
+      with:
+        node-version: '16' # Set your Node.js version here
+
+    # Step 3: Install dependencies
+    - name: Install dependencies
+      run: yarn install
+
+    # Step 4: Install Expo CLI and EAS CLI
+    - name: Install Expo and EAS CLI
+      run: yarn global add expo-cli eas-cli
+
+    # Step 5: Login to Expo with environment variable
+    - name: Log in to Expo
+      run: eas login --token ${{ secrets.EXPO_TOKEN }} # Set EXPO_TOKEN in your repository secrets
+
+    # Step 6: Increment version and build for Android
+    - name: Build Android
+      run: |
+        eas build --platform android --profile production --non-interactive
+      env:
+        EAS_PROJECT_ID: ${{ secrets.EAS_PROJECT_ID }}
+        APP_ENV: production
+        GITHUB_RUN_NUMBER: ${{ github.run_number }}
+
+    # Step 7: Increment version and build for iOS
+    - name: Build iOS
+      run: |
+        eas build --platform ios --profile production --non-interactive
+      env:
+        EAS_PROJECT_ID: ${{ secrets.EAS_PROJECT_ID }}
+        APP_ENV: production
+        GITHUB_RUN_NUMBER: ${{ github.run_number }}
+
+    # Optional: Upload to stores
+    deploy:
+      needs: build
+      runs-on: ubuntu-latest
+      steps:
+      - name: Upload APK to Google Play Store
+        run: |
+          fastlane supply --apk ./builds/android/app-release.aab --track production --json_key ${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT }} --package_name com.payk12.ticketmanager
+        env:
+          SUPPLY_PACKAGE_NAME: com.payk12.ticketmanager
+          SUPPLY_JSON_KEY: ${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT }}
+      
+      - name: Upload IPA to TestFlight
+        run: |
+          fastlane pilot upload --ipa ./builds/ios/app.ipa --team_id ${{ secrets.APPLE_TEAM_ID }} --app_identifier com.payk12.ticketmanager
+        env:
+          FASTLANE_APPLE_APPLICATION_SPECIFIC_PASSWORD: ${{ secrets.APP_SPECIFIC_PASSWORD }}

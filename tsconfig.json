@@ -3,18 +3,27 @@
   "compilerOptions": {
     "strict": true,
     "paths": {
+      "@/common/*": [
+        "./features/common/*"
+      ],
+      "@/redemption/*": [
+        "./features/redemption/*"
+      ],
+      "@/ticketing/*": [
+        "./features/ticketing/*"
+      ],
+      "@/auth/*": [
+        "./features/auth/*"
+      ],
       "@/*": [
         "./*"
       ],
-      "@/ui/*": [
-        "./components/ui/*"
-      ]
     }
   },
   "include": [
     "**/*.ts",
     "**/*.tsx"
-  ],
+, "app.config.ts.bak"  ],
   "exclude": [
     "!old_src/**/*"
   ]

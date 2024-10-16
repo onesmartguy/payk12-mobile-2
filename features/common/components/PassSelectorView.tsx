@@ -1,31 +1,21 @@
-import React, { memo, useRef } from 'react';
-import {
-  Dimensions,
-  SectionList,
-  SectionListData,
-  StyleSheet,
-} from 'react-native';
-import { FlatList, RectButton, Swipeable } from 'react-native-gesture-handler';
-import { groupBy, map, min, orderBy } from 'lodash';
-import { BoxProps, TextProps, backgroundColor } from '@shopify/restyle';
-import { FontAwesomeIcon } from '@fortawesome/react-native-fontawesome';
-import { faEllipsisV } from '@fortawesome/pro-regular-svg-icons';
-import Animated, {
-  Extrapolate,
-  interpolate,
-  useAnimatedStyle,
-  useSharedValue,
-} from 'react-native-reanimated';
+import { BoxProps, TextProps } from "@shopify/restyle";
+import Box from "./Box";
+import { palette, Theme } from "@/utils/theme";
+import { EventModel, PassModel, SchoolModel } from "../types";
+import { Dimensions, SectionList, SectionListData, StyleSheet } from "react-native";
+import TextView from "./TextView";
+import { memo, useRef } from "react";
+import Animated, { Extrapolate, interpolate, useAnimatedStyle, useSharedValue } from "react-native-reanimated";
+import { RectButton, Swipeable } from "react-native-gesture-handler";
+import { FontAwesomeIcon } from "@fortawesome/react-native-fontawesome";
+import { faEllipsisV } from "@fortawesome/pro-regular-svg-icons";
+import { groupBy, map, maxBy, orderBy } from "lodash";
 
-import { getDateAsString } from '../../../utils';
-import { Text, Box } from '../../../ui';
-import { Pass, School } from '../types';
-import { palette, Theme } from '../../../ui/theme';
 
 
 const win = Dimensions.get('window');
 
-interface PassRow extends BoxProps<Theme>, Pass {
+interface PassRow extends BoxProps<Theme>, PassModel {
   ticketCount: number;
   nameStyle?: TextProps<Theme>;
   startDateStyle?: TextProps<Theme>;
@@ -34,13 +24,10 @@ interface PassRow extends BoxProps<Theme>, Pass {
 
 const PassBaseRow = ({
   name,
-  upcomingEvent,
-  upcomoningEvent,
   isShareable,
+  seat,
   isRedeemable,
   isHoldToRedeem,
-  uses,
-  reserveInfo,
   ticketCount,
   nameStyle,
   startDateStyle,
@@ -48,34 +35,35 @@ const PassBaseRow = ({
   ...props
 }: PassRow) => {
   return (
-    <Box {...props}>
+    <Box>
       {name && (
-        <Text variant="EventRowName" {...nameStyle}>
+        <TextView variant="EventRowName" {...nameStyle}>
           {name}
-        </Text>
+        </TextView>
       )}
       
-        <Text variant="EventRowStartDate" {...startDateStyle}>
-          {reserveInfo}
-        </Text>
+        <TextView variant="EventRowStartDate" {...startDateStyle}>
+          {seat ? `Seat: ${seat.name}, Row: ${seat.row}, Sec: ${seat.section}` : 'General Admission'}
+        </TextView>
     
 
-      <Text variant="EventRowTicketCount" {...ticketsStyle}>
+      <TextView variant="EventRowTicketCount" {...ticketsStyle}>
         {ticketCount > 0
           ? `(${ticketCount}) Event${ticketCount > 1 ? 's' : ''} Left`
           : 'Expired'}
-      </Text>
+      </TextView>
     </Box>
   );
 };
 interface Props extends BoxProps<Theme> {
-  passes: Pass[];
-  school?: School;
-  onSelected: (pass: Pass) => void;
-  isShareable?: (pass: Pass) => boolean;
-  onShare?: (pass: Pass) => void;
+  passes: PassModel[];
+  events: EventModel[];
+  school?: SchoolModel;
+  onSelected: (pass: PassModel) => void;
+  isShareable?: (pass: PassModel) => boolean;
+  onShare?: (pass: PassModel) => void;
 }
-
+const remainingUses = (pass: PassModel) => ((pass.passType == 'multi' ? pass.maxUses : pass.allowedEventIds.length) - pass.redeemedEventIds.length) ?? 0;
 const PassItem = memo(
   ({
     pass,
@@ -83,26 +71,15 @@ const PassItem = memo(
     onShare,
     onSelected,
   }: {
-    pass: Pass;
+    pass: PassModel;
     onShare?: () => void;
     shareable: boolean;
     onSelected?: () => void;
   }) => {
 
     const swipeableRef = useRef<Swipeable>(null)
-    const translateX = useSharedValue(0);
-    const leftActionStyles = useAnimatedStyle(() => {
-      const transX = interpolate(
-        translateX.value,
-        [0, 50, win.width / 4, win.width / 4], // between the beginning and end of the slider
-        [-(win.width / 4), 0, 0, 1], // penguin will make 4 full spins
-        Extrapolate.CLAMP
-      );
 
-      return {
-        transform: [{ translateX: transX }],
-      };
-    });
+
 
     const onClose = () => {};
 
@@ -115,8 +92,7 @@ const PassItem = memo(
               justifyContent: 'center',
               backgroundColor: palette.lighterGray,
               width: win.width / 4,
-            },
-            leftActionStyles,
+            }
           ]}
           onPress={() => {
             swipeableRef.current?.close();
@@ -138,7 +114,6 @@ const PassItem = memo(
     };
 
     const opacity = shareable ? 1 : 0;
-    const gamesLeft = pass.remainingUses || pass.events.filter(x => x.isRedeemable).length || 0;
     return (
       <Swipeable
         ref={swipeableRef}
@@ -163,7 +138,7 @@ const PassItem = memo(
               <FontAwesomeIcon icon={faEllipsisV} />
             </Box>
 
-            <PassBaseRow {...pass} ticketCount={gamesLeft} />
+            <PassBaseRow {...pass} ticketCount={remainingUses(pass)} />
           </Box>
         </RectButton>
       </Swipeable>
@@ -174,55 +149,57 @@ const PassItem = memo(
 export const PassSelectorView: React.FC<Props> = ({
   passes,
   school,
+  events,
   isShareable,
   onShare,
   onSelected,
   ...props
 }) => {
   const titleText = 'Select your Pass';
-  const handleSelectedPass = (pass: Pass) => {
+  const handleSelectedPass = (pass: PassModel) => {
     if (onSelected) onSelected(pass);
   };
-  const shareable = (pass: Pass) => {
+  const shareable = (pass: PassModel) => {
       return pass.isShareable && onShare != undefined;  
   };
   const renderHeader = () => (
     <Box flex={1}>
-      <Text variant="title" marginBottom="lg">
+      <TextView variant="title" marginBottom="lg">
         {titleText}
-      </Text>
+      </TextView>
       {school && 
       (<Box>
-        <Text variant="header2" marginBottom="m">
+        <TextView variant="header2" marginBottom="m">
           {school.name}
-        </Text>
-        <Text marginBottom="m">
+        </TextView>
+        <TextView marginBottom="m">
           Select a pass below to gain access to your event.
-        </Text>
+        </TextView>
       </Box>)
       }
     </Box>
   );
   const renderSectionHeader = (info: {
     section: SectionListData<
-      Pass,
+      PassModel,
       {
         title: string;
-        data: Pass[];
+        data: PassModel[];
       }
     >;
   }) => (
     <Box backgroundColor="listSectionBackgroudColor" padding="xs">
-      <Text variant="sectionHeader">{info.section.title}</Text>
+      <TextView variant="sectionHeader">{info.section.title}</TextView>
     </Box>
   );
   const sectionGroup = groupBy(passes, (p) =>
-    (!p.remainingUses || p.remainingUses > 0) ? 'My Passes' : 'Expired' 
+    (remainingUses(p)) ? 'My Passes' : 'Expired' 
   );
+  const passEvents = (pass: PassModel) => pass.allowedEventIds.map((id) => events?.find((e) => e.id === id));
   const sections = orderBy(
     map(sectionGroup, (data, key) => ({
       title: key,
-      data: orderBy(data, (x) => x.upcomingEvent?.startTime || x.startTime, "desc"),
+      data: orderBy(data, (x) => maxBy(passEvents(x), e => e?.startTime), "desc"),
       sort: key === 'Expired' ? 2 : 1,
     })),
     'sort'

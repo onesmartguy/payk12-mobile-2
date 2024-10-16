@@ -6,44 +6,37 @@ import {
 } from 'react-native';
 import { useIsFocused } from '@react-navigation/native';
 import { useTheme } from '@shopify/restyle';
-
-import { TicketIcon } from '../../../assets';
-import { WEBSITE_URL } from '../../common/constants';
-import {
-  Button,
-  Text,
-  Box,
-} from '../../../ui';
-import { MainLayout } from '../../../components';
-import { useRedeemTicketAsAdminMutation } from '../../redemption/service';
-import { PassView } from '../../../components/PassView';
-import {
-  SchoolSelectorView,
-  EventSelectorView,
-  PassSelectorView,
-} from '../../common/components';
-import { Theme } from '../../../ui/theme';
-import { PassShareSheet, PassShareBottomSheet, BasicBottomSheet, BasicSheet } from '../../common/sheets';
-import usePasses from '@app/hooks/usePasses';
-import { School, Event, Pass } from '@app/features/common/types';
-import { PassholderScreens } from '../ticketNavigation';
-import { StackScreenProps } from '@react-navigation/stack';
-import useSharing, { ShareResult } from '@app/hooks/useSharing';
+import { BasicBottomSheet, BasicSheet, PassShareBottomSheet, PassShareSheet } from '@/common/sheets';
+import { EventModel, PassModel, SchoolModel } from '@/common/types';
+import usePasses from '../hooks/usePasses';
+import useSessionStore from '@/auth/stores/useSessionStore';
+import { Theme } from '@/utils/theme';
+import { useRedemptionHub } from '@/redemption/hooks/useRedemptionHub';
+import Box from '@/common/components/Box';
+import { TicketIcon } from '@/assets';
+import TextView from '@/common/components/TextView';
+import Button from '@/common/components/Button';
+import { siteUrl } from '@/utils/constants';
 import { FontAwesomeIcon } from '@fortawesome/react-native-fontawesome';
-import { faTimes } from '@fortawesome/pro-solid-svg-icons';
-import { useCurrentUser } from '@app/features/auth/authSlice';
-import { useQueryClient } from '@tanstack/react-query';
-import { useRedemptionHub } from '@app/hooks/useRedemptionHub';
+import SchoolSelectorView from '@/common/components/SchoolSelectorView';
+import { faTimes } from '@fortawesome/pro-regular-svg-icons';
+import PassSelectorView from '@/common/components/PassSelectorView';
+import EventSelectorView from '@/common/components/EventSelectorView';
+import PassView from '@/common/components/PassView';
+import useSharing from '../hooks/useSharing';
+import { ShareResult } from '@/api/ticketing';
 
-interface Props extends StackScreenProps<PassholderScreens, 'PassSelector' > {}
 
-export const PassSelectionScreen: React.FC<Props> = ({ navigation }) => {
+
+type Props = {}
+
+export const PassSelectionScreen: React.FC<Props> = ({  }) => {
   const shareRef = useRef<PassShareSheet>(null);
   const basicSheetRef = useRef<BasicSheet>(null);
+  const userId = useSessionStore(x => x.user!.id);
+  const [filter, setFilter] = useState<{school?: SchoolModel, event?: EventModel, pass?: PassModel}>({});
   
-  const [filter, setFilter] = useState<{school?: School, event?: Event, pass?: Pass}>({});
-  
-  const [redeemPassAsync, redeemPassStatus] = useRedeemTicketAsAdminMutation();
+ 
   const isFocused = useIsFocused()
   const {
     passes,
@@ -54,8 +47,6 @@ export const PassSelectionScreen: React.FC<Props> = ({ navigation }) => {
     isLoading
   } = usePasses();
   const { sharePass } = useSharing()
-  const { id } = useCurrentUser()
-  const queryClient = useQueryClient()
   const [itemWidth, setItemWidth] = useState<number | undefined>();
   const [showLoading, setShowLoading] = useState(false);
   const theme = useTheme<Theme>();
@@ -71,66 +62,66 @@ export const PassSelectionScreen: React.FC<Props> = ({ navigation }) => {
     }
   }, [passes, isFocused, isRefetchingByUser])
 
-  const redeemPass = async (pass: Pass, event: Event) => {
+  const redeemPass = async (pass: PassModel, event: EventModel) => {
     setShowLoading(true);
     
     if (!filter.school || !filter.event) return;
-    const passes = [pass.formattedNumber] as any;
+    const passes = [pass.formattedCode ?? pass.code] as any;
 
     const data = {
       schoolId: filter.school.id,
       events: [filter.event.id],
       tickets: passes,
     };
-    const results = await redeemPassAsync(data);
-    console.log('results', JSON.stringify(results, null, 2))
+    // const results = await redeemPassAsync(data);
+    // console.log('results', JSON.stringify(results, null, 2))
     await refetchByUser();
 
     setShowLoading(false);
   };
-  const { ticketSharedEvent, ticketRedeemedEvent } = useRedemptionHub({userId: id}, [id])
+  const { ticketSharedEvent, ticketRedeemedEvent } = useRedemptionHub({userId: userId}, [userId])
   useEffect(() => {
     if(ticketRedeemedEvent){
-      queryClient.invalidateQueries(['mypasses'])
+      //queryClient.invalidateQueries(['mypasses'])
       refetchByUser()
     }
   }, [ticketRedeemedEvent, ticketSharedEvent])
-  const onShare = (pass: Pass) => {
+  const onShare = (pass: PassModel) => {
     if (shareRef.current) {
       shareRef.current?.show(pass);
     }
   };
-  const isShareable = (pass: Pass) => {
+  const isShareable = (pass: PassModel) => {
     return pass.isShareable;
   };
   const NoResults = () => (
     <Box flex={1} alignItems="center" justifyContent="center">
       <TicketIcon />
-      <Text variant="header2" marginTop="lg">
+      <TextView variant="header2" marginTop="lg">
         No passes for upcoming events
-      </Text>
+      </TextView>
       <Box marginTop="3xl" padding="lg">
         <Button
           variant="primary"
           label="Find Events"
           onPress={() => {
-            Linking.openURL(`${WEBSITE_URL}`);
+            Linking.openURL(`${siteUrl}`);
           }}
         />
-        <Text marginTop="lg" textAlign="center" padding="lg">
+        <TextView marginTop="lg" textAlign="center" padding="lg">
           Seach our virtual marketplace to find an event for your school.
-        </Text>
+        </TextView>
       </Box>
     </Box>
   );
 
-  const ShareResultView = (result: ShareResult) => (
+  const ShareResultView: React.FC<{result: ShareResult, onClose: () => void}> = ({result, onClose}) => (
     <Box padding='m' justifyContent="center" alignItems="center">
       {result.isSuccess ? <Box marginVertical='m'>
-        <Text variant='header2' textAlign='center'>Ticket(s) successfully sent to</Text>
-        <Text variant='EventRowTicketCount' textAlign='center'>{result.email}</Text>
-      </Box> : <Box><Text textAlign='center'>Ticket(s) could not be shared</Text></Box>}
-      <Box onTouchEnd={() => {basicSheetRef.current?.close()}}>
+        <TextView variant='header2' textAlign='center'>Ticket(s) successfully sent to</TextView>
+        <TextView variant='EventRowTicketCount' textAlign='center'>{result.email}</TextView>
+      </Box> : <Box><TextView textAlign='center'>Ticket(s) could not be shared</TextView></Box>}
+      <Box onTouchEnd={onClose}>
         <FontAwesomeIcon icon={faTimes} size={24} />
       </Box>
     </Box>
@@ -158,9 +149,9 @@ export const PassSelectionScreen: React.FC<Props> = ({ navigation }) => {
     }
 
     if (filter.school && !filter.pass){
-      const passList = passes.filter(p => p.schoolId === filter.school?.id).map(x => ({...x, eventsLeft: x.isMultiEventPass
-        ? x.remainingUses
-        : (x.events ?? []).length}))
+      const passList = passes.filter(p => p.schoolId === filter.school?.id).map(x => ({...x, eventsLeft: x.passType === 'multi'
+        ? x.maxUses - x.redeemedEventIds.length
+        : (x.allowedEventIds ?? []).length}))
       return (
         <PassSelectorView
           school={filter.school}
@@ -174,16 +165,17 @@ export const PassSelectionScreen: React.FC<Props> = ({ navigation }) => {
       );
     }
     if (filter.school && filter.pass && !filter.event)
+      
       return (
         <Box marginHorizontal="lg">
           <Box marginBottom="xl">
-            <Text variant="title" marginBottom="lg">
+            <TextView variant="title" marginBottom="lg">
               Events
-            </Text>
-            <Text>
+            </TextView>
+            <TextView>
               Select event to scan tickets at the gate or search for a customer
               to check in.
-            </Text>
+            </TextView>
           </Box>
           <EventSelectorView
             events={passes.find(x => x.id === filter.pass?.id)?.events.map(e => ({...e, isShareable: false})) || []}
@@ -211,27 +203,7 @@ export const PassSelectionScreen: React.FC<Props> = ({ navigation }) => {
   };
 
   return (
-    <MainLayout
-      showHeader
-      headerOptions={{
-        onBackPress: () => {
-          if (filter.event) {
-            setFilter(f => ({...f, event: undefined}));
-            return;
-          }
-          if (filter.pass) {
-            setFilter(f => ({...f, pass: undefined}));
-            return;
-          }
-
-          if (filter.school) {
-            setFilter(f => ({...f, school: undefined}));
-            return;
-          }
-          navigation.goBack();
-        },
-      }}
-      showLoading={showLoading}
+    <Box flex={1}
     >
       <Box flex={1}>
         <Box flex={1}>{renderContent()}</Box>
@@ -242,7 +214,7 @@ export const PassSelectionScreen: React.FC<Props> = ({ navigation }) => {
           const shareResult = await sharePass(data);
 
           shareRef.current?.close();
-          basicSheetRef.current?.show(<ShareResultView {...shareResult} />)
+          basicSheetRef.current?.show(<ShareResultView result={shareResult} onClose={basicSheetRef.current.close}  />)
         }}
         onClose={() => {
 
@@ -250,7 +222,7 @@ export const PassSelectionScreen: React.FC<Props> = ({ navigation }) => {
       />
       <BasicBottomSheet
         ref={basicSheetRef} />
-    </MainLayout>
+    </Box>
   );
 };
 

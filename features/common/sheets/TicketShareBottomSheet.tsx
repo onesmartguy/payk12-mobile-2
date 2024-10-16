@@ -1,49 +1,33 @@
-import React, {
-  useRef,
-  useMemo,
-  useCallback,
-  useState,
-  forwardRef,
-  useImperativeHandle,
-  memo,
-} from 'react';
-import BottomSheet, {
-  BottomSheetView,
-  useBottomSheetDynamicSnapPoints,
-} from '@gorhom/bottom-sheet';
-import {FontAwesomeIcon} from '@fortawesome/react-native-fontawesome';
-import {faExclamationTriangle} from '@fortawesome/pro-regular-svg-icons';
-import {ScrollView} from 'react-native-gesture-handler';
-import {map} from 'lodash';
+import BottomSheet, { BottomSheetProps, BottomSheetView } from "@gorhom/bottom-sheet";
+import { CheckboxItem, EventModel, TicketModel } from "../types";
+import { forwardRef, memo, useCallback, useImperativeHandle, useMemo, useRef, useState } from "react";
+import RadioField, { RadioFieldOption } from "../components/RadioField";
+import { CommonStyles } from "./style";
+import Box from "../components/Box";
+import TextView from "../components/TextView";
+import { FontAwesomeIcon } from "@fortawesome/react-native-fontawesome";
+import { faExclamationTriangle } from "@fortawesome/pro-regular-svg-icons";
+import { palette } from "@/utils/theme";
+import { ScrollView } from "react-native";
+import { map } from "lodash";
+import CheckboxField from "../components/CheckboxField";
+import Button from "../components/Button";
+import TextField from "../components/TextField";
+import { Formik } from "formik";
 
-import {palette} from '../../../ui/theme';
-import {Event, Ticket, CheckboxItem, BottomSheetProps} from '../types';
-import {
-  Box,
-  Text,
-  Button,
-  TextInputField,
-  RadioFieldOption,
-  RadioField,
-  CheckboxField,
-} from '../../../ui';
 
-import {CommonStyles} from './style';
-
-export {CommonStyles} from './style';
-
-interface TicketShareBottomSheetProps extends BottomSheetProps {
+interface TicketShareBottomSheetProps extends Partial<BottomSheetProps> {
   onClose?: () => void;
   onSubmit: (form: FormData) => void;
 }
 
 export type TicketShareSheet = {
-  show: (event: Event, tickets: Ticket[]) => void;
+  show: (event: EventModel) => void;
   close: () => void;
 };
 const initalState = {
   email: '',
-  tickets: [] as CheckboxItem<Ticket>[],
+  tickets: [] as CheckboxItem<TicketModel>[],
   sent: false
 };
 type FormData = {
@@ -55,103 +39,106 @@ const radioOptions: RadioFieldOption[] = [
   {name: 'All tickets', value: 'All tickets'},
   {name: 'Choose tickets', value: 'Choose tickets'},
 ];
-const TicketShareBottomSheetComponent = forwardRef<
+export const TicketShareBottomSheet = forwardRef<
   TicketShareSheet,
   TicketShareBottomSheetProps
 >(({onClose, onSubmit, ...props}, ref) => {
   const bottomSheetRef = useRef<BottomSheet>(null);
-  const [event, setEvent] = useState<Event>();
+  const [event, setEvent] = useState<EventModel>();
   const [state, setState] = useState(initalState);
   const [chooseTickets, setChooseTickets] = useState('All tickets');
 
   const snapPoints = useMemo(() => ['CONTENT_HEIGHT'], []);
-  const {
-    animatedHandleHeight,
-    animatedSnapPoints,
-    animatedContentHeight,
-    handleContentLayout,
-  } = useBottomSheetDynamicSnapPoints(snapPoints);
 
-  // callbacks
-  const show = (evt: Event, tickets: Ticket[]) => {
-    setState(initalState);
-    if (evt) {
-      setEvent(evt);
-    }
-    if (tickets) {
-      setState({
-        ...state,
-        tickets: tickets.filter(x => x.isShareable).map(x => ({...x, isSelected: false})),
-      });
-    }
-
-    bottomSheetRef.current?.snapToIndex(0);
-  };
-
-  const close = useCallback(() => {
+  const handleClose = useCallback(() => {
     setState(initalState);
     setChooseTickets('All tickets')
     bottomSheetRef.current?.close();
     onClose && onClose();
   }, []);
+
+  const handleShow = useCallback((evt: EventModel) => {
+    setState(initalState);
+      evt && setEvent(evt);
+      evt.tickets &&
+        setState({
+          ...state,
+          tickets: evt.tickets.filter(x => x.isShareable).map(x => ({...x, isSelected: false})),
+        });
+      bottomSheetRef.current?.snapToIndex(0);
+  }, []);
+
   useImperativeHandle(ref, () => ({
-    show,
-    close,
+    show: handleShow,
+    close: handleClose,
   }));
 
   const selectedTickets = 
     chooseTickets == 'Choose tickets' ? 
       state.tickets.filter(x => x.isSelected).map(x => x.id) : 
       chooseTickets == 'All tickets' ? state.tickets.map(x => x.id) : []
+
+  if(event == null){
+    return null;
+  }
   return (
     <BottomSheet
       ref={bottomSheetRef}
       index={0}
-      snapPoints={animatedSnapPoints}
-      handleHeight={animatedHandleHeight}
-      contentHeight={animatedContentHeight}
       enablePanDownToClose
+      enableDynamicSizing
       style={CommonStyles.container}
       {...props}>
-      <BottomSheetView onLayout={handleContentLayout}>
+       
+      <BottomSheetView>
         {event && (
+           <Formik initialValues={{email: ''}} onSubmit={() => {
+            onSubmit({
+              ...state,
+              tickets: selectedTickets,
+              eventId: event.id
+            })
+          }}>
+            {({ handleChange, handleBlur, handleSubmit, values, errors, touched }) => (
           <Box margin="lg">
             {!state.sent && (
               <>
                 <Box>
-                  <Text variant="header2" fontSize={18}>
+                  <TextView variant="header2" fontSize={18}>
                     {event.name}
-                  </Text>
-                  <Text>
+                  </TextView>
+                  <TextView>
                     ({event.availibleTickets}) Ticket
                     {event.availibleTickets > 1 && 's'}
-                  </Text>
+                  </TextView>
                 </Box>
                 <Box>
                   <Box marginTop="m">
-                    <Text>
-                      <FontAwesomeIcon
+                  <FontAwesomeIcon
                         icon={faExclamationTriangle}
                         style={{marginRight: 12}}
                         color={palette.yellow}
                       />
+                    <TextView>
+                      
                       Your ticket(s) may not be available after sharing them from
                       this screen.
-                    </Text>
+                    </TextView>
                   </Box>
 
-                  <Text marginTop="m">
+                  <TextView marginTop="m">
                     The new ticket holder(s) will receive an email with the new
                     ticket(s). You may revoke this transfer at any time.
-                  </Text>
+                  </TextView>
 
-                  <Text marginTop="m" variant="header2" fontSize={18}>
+                  <TextView marginTop="m" variant="header2" fontSize={18}>
                     Send to:
-                  </Text>
-                  <TextInputField
+                  </TextView>
+                  <TextField
+                    name="email"
                     placeholder="Email"
                     value={state.email}
-                    onChange={val => setState(s => ({...s, email: val}))}
+                    onChangeText={val => setState(s => ({...s, email: val}))}
                   />
                   <RadioField
                     options={radioOptions}
@@ -168,9 +155,9 @@ const TicketShareBottomSheetComponent = forwardRef<
                           borderBottomColor="darkGray"
                           borderBottomWidth={1}
                           marginTop="lg">
-                          <Text variant="header2" fontSize={14} lineHeight={14}>
+                          <TextView variant="header2" fontSize={14} lineHeight={14}>
                             Select one or more tickets:
-                          </Text>
+                          </TextView>
                         </Box>
                         {state.tickets &&
                           map(state.tickets, (item, i) => (
@@ -191,16 +178,16 @@ const TicketShareBottomSheetComponent = forwardRef<
                               />
 
                               <Box marginLeft="lg">
-                                <Text variant="EventRowName" fontSize={20}>
+                                <TextView variant="EventRowName" fontSize={20}>
                                   {item.ownerName}
-                                </Text>
-                                <Text
+                                </TextView>
+                                <TextView
                                   variant="EventRowTicketCount"
                                   fontSize={14}>
-                                  Ticket #{item.ticketNumber}
-                                </Text>
+                                  Ticket #{item.code}
+                                </TextView>
                                 {item.seat && (
-                                  <Text
+                                  <TextView
                                     variant="EventRowStartDate"
                                     fontSize={14}>
                                     Sec: {item.section}
@@ -208,7 +195,7 @@ const TicketShareBottomSheetComponent = forwardRef<
                                     {'  '}
                                     Seat:
                                     {item.seat}
-                                  </Text>
+                                  </TextView>
                                 )}
                               </Box>
                             </Box>
@@ -224,27 +211,20 @@ const TicketShareBottomSheetComponent = forwardRef<
                             : ''
                         } Ticket${selectedTickets.length > 1 ? 's' : ''}`}
                         disabled={!(state.email && selectedTickets.length > 0)}
-                        onPress={() =>
-                          onSubmit &&
-                          onSubmit({
-                            ...state,
-                            tickets: selectedTickets,
-                            eventId: event.id
-                          })
-                        }
+                        onPress={() => handleSubmit()}
                       />
-                      <Button label="Cancel Sharing" onPress={close} />
+                      <Button label="Cancel Sharing" onPress={() => handleClose()} />
                     </Box>
                   </ScrollView>
                 </Box>
               </>
             )}
-          </Box>
+          </Box>)}
+          </Formik>
         )}
       </BottomSheetView>
     </BottomSheet>
   );
 });
 
-const TicketShareBottomSheet = memo(TicketShareBottomSheetComponent);
 export default TicketShareBottomSheet;

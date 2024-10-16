@@ -1,40 +1,37 @@
-import React, { useCallback, useContext, useEffect, useState } from 'react';
-import { ActivityIndicator, RefreshControl } from 'react-native';
-import {
-  DrawerScreenProps,
-  DrawerNavigationProp,
-} from '@react-navigation/drawer';
-import { FlatList } from 'react-native-gesture-handler';
-import qs from 'query-string';
-import { orderBy } from 'lodash';
-import { useNavigation } from '@react-navigation/native';
-import { StackNavigationProp, StackScreenProps } from '@react-navigation/stack';
-import { BoxProps } from '@shopify/restyle';
+import { Theme } from "@/utils/theme";
+import { SchoolModel } from "../types";
+import { BoxProps } from "@shopify/restyle";
+import Box from "./Box";
+import TextView from "./TextView";
+import { FlatList } from "react-native";
+import BasicListItem from "./BasicListItem";
+import { orderBy } from "lodash";
+import { useEffect } from "react";
 
-import { StackParamList } from '../../../navigation';
-import { Header, MainLayout, BasicListItem } from '../../../components';
-import { Text, Box, SearchBox, NoResultsBox } from '../../../ui';
-import { School } from '../types';
-import { Theme } from '../../../ui/theme';
 
 interface Props extends BoxProps<Theme> {
-  schools: School[];
-  onSelected: (school: School) => void;
+  schools: SchoolModel[];
+  onSelected: (school: SchoolModel) => void;
 }
 export const SchoolSelectorView: React.FC<Props> = ({
   schools,
   onSelected,
   ...props
 }) => {
-  const titleText = 'Select your school';
-  const handleSelectedSchool = (school: School) => {
+  const titleText = 'Schools';
+  useEffect(() => {
+    if(schools.length === 1) {
+      onSelected(schools[0]);
+    }
+  }, [schools]);
+  const handleSelectedSchool = (school: SchoolModel) => {
     if (onSelected) onSelected(school);
   };
   const renderHeader = () => (
     <Box flex={1}>
-      <Text variant="title" marginBottom="lg">
+      <TextView variant="title" marginBottom="lg">
         {titleText}
-      </Text>
+      </TextView>
     </Box>
   );
 

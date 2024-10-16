@@ -1,8 +1,8 @@
 import React, { createRef, useEffect, useState } from 'react';
 import LottieView from 'lottie-react-native';
 import { StyleSheet } from 'react-native';
+import Box from '@/common/components/Box';
 
-import { Box, Text } from '../../../ui';
 
 interface RedemptionButtonProps {
   onPress?: () => void;

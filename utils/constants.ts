@@ -1,13 +1,14 @@
 import Constants from 'expo-constants';
 
 type Environment = {
-    environmentName: string;
-    apiHost: string;
-    appPrimaryColor: string;
+    envName: string;
+    version: string;
+    apiUrl: string;
+    siteUrl: string;
 }
 // Access environment-specific variables
 const envs = ((Constants.expoConfig?.extra || {}) as Environment);
-export const { environmentName, apiHost, appPrimaryColor } = envs;
+export const { apiUrl, siteUrl, version, envName } = envs;
 console.log(`Constants (extras)`, envs);
 
 export default envs;

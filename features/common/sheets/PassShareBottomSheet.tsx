@@ -1,43 +1,27 @@
-import React, {
-  useRef,
-  useMemo,
-  useState,
-  forwardRef,
-  useImperativeHandle,
-  memo,
-} from 'react';
-import BottomSheet, {
-  BottomSheetScrollView,
-  useBottomSheetDynamicSnapPoints,
-} from '@gorhom/bottom-sheet';
-import {FontAwesomeIcon} from '@fortawesome/react-native-fontawesome';
-import {faExclamationTriangle} from '@fortawesome/pro-regular-svg-icons/faExclamationTriangle';
-import {orderBy} from 'lodash';
-import {useSafeAreaInsets} from 'react-native-safe-area-context';
+import BottomSheet, { BottomSheetProps, BottomSheetScrollView } from "@gorhom/bottom-sheet";
+import { EventModel, PassModel } from "../types";
+import Box from "../components/Box";
+import CheckboxField from "../components/CheckboxField";
+import TextView from "../components/TextView";
+import { orderBy } from "lodash";
+import { getEventDateAsString } from "@/utils/events";
+import { CommonStyles } from "./style";
+import RadioField, { RadioFieldOption } from "../components/RadioField";
+import { forwardRef, memo, useImperativeHandle, useMemo, useRef, useState } from "react";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { FontAwesomeIcon } from "@fortawesome/react-native-fontawesome";
+import { palette } from "@/utils/theme";
+import { faExclamationTriangle } from "@fortawesome/pro-regular-svg-icons";
+import Button from "../components/Button";
+import TextField from "../components/TextField";
 
-import {palette} from '../../../ui/theme';
-import {BottomSheetProps, Event, Pass} from '../types';
-import {
-  Box,
-  Text,
-  Button,
-  TextInputField,
-  RadioFieldOption,
-  RadioField,
-  CheckboxField,
-} from '../../../ui';
-import {getEventDateAsString} from '../../../utils/EventUtils';
 
-import {CommonStyles} from './style';
-
-export {CommonStyles} from './style';
-
-interface PassShareBottomSheetProps extends BottomSheetProps {
+interface PassShareBottomSheetProps extends Partial<BottomSheetProps> {
   onClose?: () => void;
   onSubmit: (form: FormData) => void;
 }
 export type PassShareSheet = {
-  show: (pass: Pass) => void;
+  show: (pass: PassModel) => void;
   close: () => void;
 };
 const initalState = {
@@ -61,24 +45,19 @@ const PassShareBottomSheetComponent = forwardRef<
   PassShareBottomSheetProps
 >(({onClose, onSubmit, ...props}, ref) => {
   const bottomSheetRef = useRef<BottomSheet>(null);
-  const [pass, setPass] = useState<Pass>();
+  const [pass, setPass] = useState<PassModel>();
   const [state, setState] = useState(initalState);
   const [transferAll, setTransferAll] = useState(true);
 
   const snapPoints = useMemo(() => ['CONTENT_HEIGHT'], []);
-  const {
-    animatedHandleHeight,
-    animatedSnapPoints,
-    animatedContentHeight,
-    handleContentLayout,
-  } = useBottomSheetDynamicSnapPoints(snapPoints);
+ 
   useImperativeHandle(ref, () => ({
     show,
     close,
   }));
   const {bottom: bottomSafeArea} = useSafeAreaInsets();
   // callbacks
-  const show = (p: Pass) => {
+  const show = (p: PassModel) => {
     setState(initalState);
     setTransferAll(true);
     if (p) {
@@ -97,7 +76,7 @@ const PassShareBottomSheetComponent = forwardRef<
     bottomSheetRef.current?.close();
     onClose && onClose();
   };
-  const renderItem = (item: Event) => (
+  const renderItem = (item: EventModel) => (
     <Box
       flexDirection="row"
       key={`k-${item.id}`}
@@ -120,12 +99,12 @@ const PassShareBottomSheetComponent = forwardRef<
       />
 
       <Box marginLeft="lg">
-        <Text variant="EventRowName" fontSize={20}>
+        <TextView variant="EventRowName" fontSize={20}>
           {item.name}
-        </Text>
-        <Text variant="EventRowTicketCount" fontSize={14}>
+        </TextView>
+        <TextView variant="EventRowTicketCount" fontSize={14}>
           {getEventDateAsString(item)}
-        </Text>
+        </TextView>
       </Box>
     </Box>
   );
@@ -138,33 +117,31 @@ const PassShareBottomSheetComponent = forwardRef<
     <BottomSheet
       ref={bottomSheetRef}
       index={0}
-      snapPoints={animatedSnapPoints}
-      handleHeight={animatedHandleHeight}
-      contentHeight={animatedContentHeight}
       enablePanDownToClose
+      enableDynamicSizing
       style={{
         ...CommonStyles.container,
       }}
       {...props}>
-      <Box onLayout={handleContentLayout}>
+      <Box>
         {pass && (
           <Box
             flexGrow={1}
             paddingHorizontal="lg"
             style={{paddingBottom: bottomSafeArea}}>
-            <Text variant="header2" fontSize={18}>
+            <TextView variant="header2" fontSize={18}>
               {pass.name}
-            </Text>
-            <Text>
+            </TextView>
+            <TextView>
               ({orderedEvents.length}) Event
               {orderedEvents.length > 1 && 's'}
-            </Text>
+            </TextView>
 
             <BottomSheetScrollView
               contentContainerStyle={{}}
               style={{flexGrow: 1, flexShrink: 1}}>
               <Box marginTop="m" flexDirection="column">
-                <Text>
+                <TextView>
                   <FontAwesomeIcon
                     icon={faExclamationTriangle}
                     style={{marginRight: 8}}
@@ -172,21 +149,22 @@ const PassShareBottomSheetComponent = forwardRef<
                   />
                   Your ticket(s) may not be available after sharing them from this
                   screen.
-                </Text>
+                </TextView>
               </Box>
 
-              <Text marginTop="m">
+              <TextView marginTop="m">
                 The new ticket holder(s) will receive an email with the new
                 ticket(s). You may revoke this transfer at any time.
-              </Text>
+              </TextView>
 
-              <Text marginTop="m" variant="header2" fontSize={18}>
+              <TextView marginTop="m" variant="header2" fontSize={18}>
                 Send to:
-              </Text>
-              <TextInputField
+              </TextView>
+              <TextField
+                name="email"
                 placeholder="Email"
                 value={state.email}
-                onChange={val => setState(s => ({...s, email: val}))}
+                onChangeText={val => setState(s => ({...s, email: val}))}
               />
               <RadioField
                 options={radioOptions}
@@ -198,9 +176,9 @@ const PassShareBottomSheetComponent = forwardRef<
               />
               {!transferAll && (
                 <Box borderBottomColor="darkGray" borderBottomWidth={1}>
-                  <Text variant="header2" fontSize={14} lineHeight={14}>
+                  <TextView variant="header2" fontSize={14} lineHeight={14}>
                     Select one or more tickets:
-                  </Text>
+                  </TextView>
                 </Box>
               )}
               {!transferAll && (<Box flexGrow={1} flexShrink={1}>{orderedEvents.map(e => renderItem(e))}</Box>)}
@@ -232,5 +210,4 @@ const PassShareBottomSheetComponent = forwardRef<
   );
 });
 
-const PassShareBottomSheet = memo(PassShareBottomSheetComponent);
-export default PassShareBottomSheet;
+export default PassShareBottomSheetComponent;

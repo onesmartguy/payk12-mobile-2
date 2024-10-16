@@ -7,54 +7,32 @@ import React, {
   useImperativeHandle,
   memo,
   ReactElement,
+  Children,
 } from 'react';
-import BottomSheet, {
-  BottomSheetView,
-  useBottomSheetDynamicSnapPoints,
-} from '@gorhom/bottom-sheet';
-import {FontAwesomeIcon} from '@fortawesome/react-native-fontawesome';
-import {faExclamationTriangle} from '@fortawesome/pro-regular-svg-icons';
-import {ScrollView} from 'react-native-gesture-handler';
-import {map} from 'lodash';
 
-import {palette} from '../../../ui/theme';
-import {Event, Ticket, CheckboxItem, BottomSheetProps} from '../types';
-import {
-  Box,
-  Text,
-  Button,
-  TextInputField,
-  RadioFieldOption,
-  RadioField,
-  CheckboxField,
-} from '../../../ui';
 
 import {CommonStyles} from './style';
+import BottomSheet, { BottomSheetProps, BottomSheetView } from '@gorhom/bottom-sheet';
 
 interface BasicBottomSheetProps extends BottomSheetProps {
   onClose?: () => void;
 }
 
-export type BasicSheet = {
-  show: (context: React.ReactElement) => void;
-  close: () => void;
-};
+// export type BasicSheet = {
+//   show: (context: React.ReactElement) => void;
+//   close: () => void;
+// };
 
 
 const BasicBottomSheetComponent = forwardRef<
-BasicSheet,
-BasicBottomSheetProps
->(({onClose, ...props}, ref) => {
+Partial<BottomSheet>,
+Partial<BasicBottomSheetProps>
+>(({onClose, children, ...props}, ref) => {
   const bottomSheetRef = useRef<BottomSheet>(null);
   const [state, setState] = useState<ReactElement>();
 
   const snapPoints = useMemo(() => ['CONTENT_HEIGHT'], []);
-  const {
-    animatedHandleHeight,
-    animatedSnapPoints,
-    animatedContentHeight,
-    handleContentLayout,
-  } = useBottomSheetDynamicSnapPoints(snapPoints);
+
 
   // callbacks
   const show = (context: React.ReactElement) => {
@@ -68,8 +46,10 @@ BasicBottomSheetProps
   }, []);
 
   useImperativeHandle(ref, () => ({
-    show,
-    close,
+    expand: () => bottomSheetRef.current?.expand(),
+    collapse: () => bottomSheetRef.current?.collapse(),
+    snapToIndex: (index: number) => bottomSheetRef.current?.snapToIndex(index),
+    close: () => bottomSheetRef.current?.close(),
   }));
 
   if(!state)
@@ -79,18 +59,14 @@ BasicBottomSheetProps
     <BottomSheet
       ref={bottomSheetRef}
       index={0}
-      snapPoints={animatedSnapPoints}
-      handleHeight={animatedHandleHeight}
-      contentHeight={animatedContentHeight}
+      snapPoints={snapPoints}
+      enableDynamicSizing
       enablePanDownToClose
       style={CommonStyles.container}
       {...props}>
-      <BottomSheetView onLayout={handleContentLayout}>
-        {state}
-      </BottomSheetView>
+        {state ?? children}
     </BottomSheet>
   );
 });
 
-const BasicBottomSheet = memo(BasicBottomSheetComponent);
-export default BasicBottomSheet;
+export default BasicBottomSheetComponent;

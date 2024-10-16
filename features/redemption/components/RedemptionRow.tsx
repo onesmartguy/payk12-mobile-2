@@ -1,11 +1,13 @@
-import moment from 'moment';
+
 import * as React from 'react';
 
-import { Box, Text } from '../../../ui';
 import { DuplicateIcon, InvalidIcon, ValidIcon } from '../../../assets';
-import { Redemption } from '../../common/types';
+import { format, formatISO } from 'date-fns';
+import { RedemptionModel } from '@/common/types';
+import Box from '@/common/components/Box';
+import TextView from '@/common/components/TextView';
 
-export const RedemptionRow = ({ redemption }: { redemption: Redemption }) => {
+export const RedemptionRow = ({ redemption }: { redemption: RedemptionModel }) => {
   let title = 'Invalid Ticket / Pass';
   let details =
     redemption && redemption.section && redemption.seat
@@ -14,7 +16,7 @@ export const RedemptionRow = ({ redemption }: { redemption: Redemption }) => {
   let Icon = InvalidIcon;
   let messageColor: any = 'error';
   let message = redemption.message;
-  const dte = moment(moment.utc(redemption.redeemedOn || redemption.scannedOn).toDate());
+  const dte = redemption.redeemedOn || redemption.scannedOn;
   switch (redemption.status) {
     case 'valid':
       title = redemption.ticketNumber;
@@ -24,16 +26,12 @@ export const RedemptionRow = ({ redemption }: { redemption: Redemption }) => {
           : null;
       Icon = ValidIcon;
       messageColor = 'infoText';
-      message = `Checked in: ${dte.format(
-        'MM/DD/YY'
-      )} at ${dte.format('h:mm A')}`
+      message = `Checked in: ${format(dte,'MM/dd/yy')} at ${format(dte, 'h:mm A')}`
       break;
     case 'duplicate':
       title = 'Duplicate Ticket / Pass';
       Icon = DuplicateIcon;
-      message = `Checked in: ${dte.format(
-        'MM/DD/YY'
-      )} at ${dte.format('h:mm A')}`
+      message = `Checked in: ${format(dte, 'MM/dd/yy')} at ${format(dte, 'h:mm A')}`
       break;
       case 'conflict':
         title = 'Conflict / No Supported';
@@ -44,11 +42,10 @@ export const RedemptionRow = ({ redemption }: { redemption: Redemption }) => {
 
     default:
       Icon = InvalidIcon;
-      details = `Scanned on: ${dte.format(
-        'MM/DD/YY')} at ${dte.format('h:mm A')}`
+      details = `Scanned on: ${format(dte, 'MM/dd/yy')} at ${format(dte, 'h:mm A')}`
       break;
   }
-  const redeemedOn = moment(redemption.redeemedOn);
+  
   return (
     <Box
       flex={1}
@@ -58,28 +55,28 @@ export const RedemptionRow = ({ redemption }: { redemption: Redemption }) => {
     >
       <Box flexGrow={1} flexDirection="row">
         <Box flex={1}>
-          <Text variant="row">{redemption.ownerName}</Text>
-          <Text variant="rowDetails" marginTop="xxs">
+          <TextView variant="row">{redemption.ownerName}</TextView>
+          <TextView variant="rowDetails" marginTop="xxs">
             {`Ticket #${redemption.ticketNumber}`}
-          </Text>
+          </TextView>
           {details && (
-            <Text variant="rowDetails" marginTop="xxs">
+            <TextView variant="rowDetails" marginTop="xxs">
               {details}
-            </Text>
+            </TextView>
           )}
         </Box>
         <Box width={100} alignItems="center" justifyContent="center">
           {Icon && <Icon height={42} width={42} />}
         </Box>
       </Box>
-      <Text
+      <TextView
         variant="rowDetails"
         fontWeight="600"
         marginTop="xxs"
         color={messageColor}
       >
         {message}
-      </Text>
+      </TextView>
     </Box>
   );
 };

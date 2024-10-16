@@ -1,16 +1,18 @@
-import { Link, Stack } from 'expo-router';
+import { Link, Stack, useNavigation, useRouter } from 'expo-router';
 import { StyleSheet } from 'react-native';
 
-import { ThemedText } from '@/components/ThemedText';
-import { ThemedView } from '@/components/ThemedView';
+import { ThemedText } from '@/features/common/components/ThemedText';
+import { ThemedView } from '@/features/common/components/ThemedView';
+import { Drawer } from 'expo-router/drawer';
 
 export default function NotFoundScreen() {
+  const navigation = useNavigation();
   return (
     <>
-      <Stack.Screen options={{ title: 'Oops!' }} />
+      <Drawer.Screen options={{ title: 'Oops!' }}  />
       <ThemedView style={styles.container}>
-        <ThemedText type="title">This screen doesn't exist.</ThemedText>
-        <Link href="/login" style={styles.link}>
+        <ThemedText type="title">This screen doesn't exist. {navigation.getId()}</ThemedText>
+        <Link href="index" style={styles.link}>
           <ThemedText type="link">Go to home screen!</ThemedText>
         </Link>
       </ThemedView>

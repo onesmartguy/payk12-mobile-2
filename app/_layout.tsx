@@ -1,39 +1,34 @@
-import { DarkTheme, DefaultTheme } from '@react-navigation/native';
+
 import { useFonts } from 'expo-font';
 import { Stack, useRouter } from 'expo-router';
-import * as SplashScreen from 'expo-splash-screen';
+import { Drawer } from 'expo-router/drawer';
 import { useEffect } from 'react';
 import 'react-native-reanimated';
+import 'react-native-gesture-handler';
 import theme from '@/utils/theme';
-import { useColorScheme } from '@/hooks/useThemeColor';
 import { ThemeProvider } from '@shopify/restyle';
-import { QueryClient, QueryClientProvider } from 'react-query';
-import useSessionStore from '@/stores/useSessionStore';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import useSessionStore from '@/auth/stores/useSessionStore';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import LoginScreen from './login';
 const queryClient = new QueryClient();
+
 // Prevent the splash screen from auto-hiding before asset loading is complete.
 //SplashScreen.preventAutoHideAsync();
 
 export default function RootLayout() {
-  const { isAuthenticated } = useSessionStore();
-  const router = useRouter();
+  const isAuthenticated  = useSessionStore(x => x.token);
   const [loaded] = useFonts({
     SpaceMono: require('../assets/fonts/SpaceMono-Regular.ttf'),
   });
-
+  const router = useRouter();
   useEffect(() => {
    
       if (loaded) {
         //SplashScreen.hideAsync();
-        if(!isAuthenticated)
-          router.push('login');
       }
   }, [loaded]);
-  useEffect(() => {
-    if (isAuthenticated) {
-      router.push('(home)');
-    }
-  }, [isAuthenticated]);
+
 
   if (!loaded) {
     return null;
@@ -43,13 +38,8 @@ export default function RootLayout() {
     <GestureHandlerRootView style={{ flex: 1 }}>
       <ThemeProvider theme={theme}>
         <QueryClientProvider client={queryClient}>
-          <Stack> 
-            <Stack.Screen name="(home)" options={{ headerShown: false }} />
-            <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-            <Stack.Screen name="get-started" options={{ headerShown: false }} />
-            <Stack.Screen name="login" options={{ headerShown: false }} />
-            <Stack.Screen name="+not-found" />
-          </Stack>
+         
+          {isAuthenticated ? <Drawer screenOptions={{ headerShown: false, }} /> : <LoginScreen />}
         </QueryClientProvider>
       </ThemeProvider>
     </GestureHandlerRootView>

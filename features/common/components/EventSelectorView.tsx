@@ -1,27 +1,19 @@
-import React from 'react';
-import { SectionList, SectionListData, StyleSheet } from 'react-native';
-import { orderBy, groupBy, map } from 'lodash';
-import { useIsFocused } from '@react-navigation/native';
-import { BoxProps } from '@shopify/restyle';
-import moment from 'moment';
-
-import { SwipeableEventRow } from '../../../components';
-import { Text, Box } from '../../../ui';
-import { Event } from '../types';
-import { Theme } from '../../../ui/theme';
-
-const eventSection = (event: Event) =>
-  moment(event.startTime).isSame(new Date(), 'day')
-    ? 'TODAY'
-    : moment(event.startTime).isBefore(new Date(), 'day')
-    ? 'PAST'
-    : 'UPCOMING';
+import { Theme } from "@/utils/theme";
+import { BoxProps } from "@shopify/restyle";
+import { EventModel } from "../types";
+import { useIsFocused } from "@react-navigation/native";
+import { SectionList, SectionListData, StyleSheet } from "react-native";
+import Box from "./Box";
+import TextView from "./TextView";
+import { groupBy, map, orderBy } from "lodash";
+import SwipeableEventRow from "./SwipeableEventRow";
+import { eventSection } from "@/utils/events";
 
 interface Props extends BoxProps<Theme> {
-  events: Event[];
-  onSelected: (event: Event) => void;
-  shareable?: (event: Event) => boolean;
-  onShareSelected?: (event: Event) => void;
+  events: EventModel[];
+  onSelected: (event: EventModel) => void;
+  shareable?: (event: EventModel) => boolean;
+  onShareSelected?: (event: EventModel) => void;
 }
 export const EventSelectorView: React.FC<Props> = ({
   events,
@@ -31,22 +23,20 @@ export const EventSelectorView: React.FC<Props> = ({
   ...props
 }) => {
   const isFocused = useIsFocused();
-  const titleText = 'Select your Event';
-
-  const handleSelectedEvent = (event: Event) => {
+  const handleSelectedEvent = (event: EventModel) => {
     if (onSelected) onSelected(event);
   };
   const renderHeader = (info: {
     section: SectionListData<
-      Event,
+      EventModel,
       {
         title: string;
-        data: Event[];
+        data: EventModel[];
       }
     >;
   }) => (
     <Box backgroundColor="listSectionBackgroudColor" padding="xs">
-      <Text variant="sectionHeader">{info.section.title}</Text>
+      <TextView variant="sectionHeader">{info.section.title}</TextView>
     </Box>
   );
   if (!isFocused) return null;

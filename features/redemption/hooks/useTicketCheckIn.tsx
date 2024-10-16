@@ -1,75 +1,52 @@
-import { useDispatch, useSelector, useStore } from 'react-redux';
-import { useState, useEffect } from 'react';
-import { isArray, uniqueId, map, orderBy, some } from 'lodash';
-import moment from 'moment';
-import { useQueryClient } from '@tanstack/react-query';
+import { EventModel, RedemptionModel, TicketModel } from "@/common/types";
+import { map, orderBy, some } from "lodash";
+import { useEffect, useState } from "react";
+import useRedemptionStore from "../stores/redemptionStore";
+import useRedeemVoucher from "./useRedeemVoucher";
+import useEventTickets from "./useEventTickets";
 
-import {
-  useRedeemTicketAsAdminMutation,
-  useGetTicketsForEvent,
-} from '../service';
-import { addTicketRedemption } from '../redemptionSlice';
-import { Event, Redemption, ListResponse, Ticket } from '../../common/types';
 
-export interface CheckInTicket extends Ticket {
+export interface CheckInTicket extends TicketModel {
   isCheckingIn?: boolean;
 }
 
-export const useTicketCheckIn = (events: Event[]) => {
-  const dispatch = useDispatch();
-
-  const [redeemTicketAsync, { isLoading: isUpdating }] =
-    useRedeemTicketAsAdminMutation();
-  const [errors, setErrors] = useState([] as Redemption[]);
-  const [tickets, setTickets] = useState<CheckInTicket[]>([]);
-  const { data, isLoading, isFetching, isStale, isSuccess, refetch } =
-    useGetTicketsForEvent(events);
-  const qClient = useQueryClient();
+export const useTicketCheckIn = (events: EventModel[]) => {
+  const { } = useRedemptionStore();
+  const { mutateAsync: redeemAsync, isPending} =  useRedeemVoucher();
+  const [errors, setErrors] = useState([] as RedemptionModel[]);
+  const [checkInTickets, setCheckInTickets] = useState<CheckInTicket[]>([]);
+  const [pendingTickets, setPendingTickets] = useState<string[]>([]);
+  const { tickets, isFetchingNextPage, isFetching, hasNextPage, refetch } = useEventTickets(events);
   const updateTicketsFromData = () => {
-    if (data?.data) {
-      const filtered = data.data.filter(x => some(events, e => e.id === x.eventId));
-      setTickets(s =>
-        orderBy(filtered, ['redeemedOn', 'ownerName'], ['desc', 'asc']),
+    if (tickets) {
+      setCheckInTickets(s =>
+        orderBy(tickets, ['redeemedOn', 'ownerName'], ['desc', 'asc']),
       );
     }
   };
   useEffect(() => {
     updateTicketsFromData();
-  }, [data, events]);
-  useEffect(() => {
-    refetch();
-  }, [events]);
-  const updateRedemptionStatus = (
-    ticket: CheckInTicket,
-    isUpdating: boolean,
-  ) => {
-    setTickets(s => {
-      const i = s.findIndex(x => x.id === ticket.id);
-      if (i > -1) {
-        s[i].isCheckingIn = isUpdating ? true : undefined;
-      }
-      return s;
-    });
-  };
-  const redeemTicket = async (ticket: CheckInTicket) => {
+  }, [events, pendingTickets]);
+
+  const redeemVoucher = async (ticket: CheckInTicket) => {
     if (!events) return;
 
-    updateRedemptionStatus(ticket, true);
+    setPendingTickets(p => [...p, ticket.code]);
+
     const payload = {
       events: map(events, x => x.id),
-      tickets: [ticket.ticketNumber],
+      vouchers: [ticket.code],
+      isHoldToRedeem: false,
     };
-    const dte = moment();
-    let scanResult = [] as Redemption[];
+    const dte = new Date();
+    let scanResult: RedemptionModel[] = [];
     try {
-      const { data }: { data: Redemption[] } = (await redeemTicketAsync(
-        payload,
-      )) as any;
+      const {data} = await redeemAsync(payload);
       scanResult = data;
       if (data.filter(x => !x.isValid)) {
         setErrors(e => [...e, ...data]);
       }
-      setTickets(ts => {
+      setCheckInTickets(ts => {
         scanResult.forEach(r => {
           const i = ts.findIndex(x => x.id.toString() == r.id);
           if(r.isValid){
@@ -78,19 +55,16 @@ export const useTicketCheckIn = (events: Event[]) => {
         });
         return [...ts];
       });
-      dispatch(addTicketRedemption(scanResult));
     } catch (_) {}
 
-    updateRedemptionStatus(ticket, false);
+    updateTicketsFromData();
     return scanResult;
   };
   const clearErrors = () => {
     setErrors([]);
   };
   return {
-    redeemTicket,
-    isUpdating,
-    isLoading,
+    redeemTicket: redeemVoucher,
     isFetching,
     tickets,
     errors,

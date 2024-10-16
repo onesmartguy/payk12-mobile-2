@@ -5,6 +5,8 @@ type LoginPayload = {
     password: string
 }
 export const loginUser = async (credentials: LoginPayload) => {
-  return await axios.post<string>(`/auth/token`, credentials);
+  
+  return await axios.post('/auth/token', credentials);
+
 };
 

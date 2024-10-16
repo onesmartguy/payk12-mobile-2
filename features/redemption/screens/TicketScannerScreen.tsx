@@ -5,39 +5,33 @@ import {
   DrawerNavigationProp,
 } from '@react-navigation/drawer';
 import {BottomSheetModalProvider} from '@gorhom/bottom-sheet';
-import moment from 'moment';
-import {useNavigation, useIsFocused, useRoute} from '@react-navigation/native';
-import {isArray} from 'lodash';
+import { format } from 'date-fns';
+import { EventModel, RedemptionModel } from '@/common/types';
+import EventUtils from '@/utils/events';
+import Box from '@/common/components/Box';
+import TextView from '@/common/components/TextView';
+import * as Icons from '@/assets/svgs';
+import { palette } from '@/utils/theme';
+import { MultiScanErrorBottomSheet, MultiScanErrorSheet, RedemptionLogBottomSheet, RedemptionLogSheet } from '../sheets';
+import { useRouter } from 'expo-router';
+import { useIsFocused } from '@react-navigation/native';
+import useMultiScanner from '../hooks/useMultiScanner';
+import QRScanner, { BarcodeResult } from '@/common/components/QRScanner';
+import { isArray } from 'lodash';
+import Button from '@/common/components/Button';
+import LoadingBlock from '@/common/components/LoadingBlock';
 
-import * as Icons from '../../../assets/icon';
-import {MainLayout} from '../../../components';
-import {Text, Box, Button, LoadingBlock} from '../../../ui';
-import {Event, Redemption} from '../../common/types';
-import QRScanner, {BarcodeResult} from '../../../components/QRScanner';
-import {EventUtils} from '../../../utils';
-import {useMultiScanner} from '../hooks/useMultiScanner';
-import {useAppContext} from '../../auth/authSlice';
-import {
-  RedemptionLogSheet,
-  RedemptionLogBottomSheet,
-  MultiScanErrorBottomSheet,
-  MultiScanErrorSheet,
-} from '../sheets';
-import {palette} from '../../../ui/theme';
-import { StackParamList } from '@app/navigation';
 
-type Props = DrawerScreenProps<StackParamList, 'TicketScanner'>;
-
-const eventDates = (event: Event) => ({
-  date: moment(event.startTime).format('MM/DD/YY'),
-  day: moment(event.startTime).format('ddd'),
-  time: moment(event.startTime).format('hh:mma'),
+const eventDates = (event: EventModel) => ({
+  date: format(event.startTime, 'MM/dd/yy'),
+  day: format(event.startTime, 'ddd'),
+  time: format(event.startTime, 'hh:mma'),
 });
 
 export const TicketScanResult = ({
   redemptionStatus,
 }: {
-  redemptionStatus?: Redemption;
+  redemptionStatus?: RedemptionModel;
 }) => {
   const readyToScannText = 'Ready to Scan';
   const df = redemptionStatus ? EventUtils.getDateAsString(new Date()) : '';
@@ -48,9 +42,9 @@ export const TicketScanResult = ({
   if (!redemptionStatus) {
     return (
       <Box alignItems="center" backgroundColor="mainBackground">
-        <Text fontSize={24} lineHeight={28} marginBottom="m">
+        <TextView fontSize={24} lineHeight={28} marginBottom="m">
           Ready to scan
-        </Text>
+        </TextView>
         <Icons.QrCodeIcon height={72} width={72} />
       </Box>
     );
@@ -89,29 +83,29 @@ export const TicketScanResult = ({
   return (
     <Box alignItems="center" marginTop="m" marginHorizontal="lg">
       {Icon && <Icon height={72} width={72} />}
-      <Text
+      <TextView
         marginTop="m"
         fontSize={22}
         lineHeight={24}
         style={{color}}
         textAlign="center">
         {lastStatus}
-      </Text>
-      <Text
+      </TextView>
+      <TextView
         fontSize={14}
         lineHeight={16}
         style={{color: detailColor}}
         textAlign="center">
         {lastStatusDetails}
-      </Text>
+      </TextView>
     </Box>
   );
 };
 
-export const TicketScannerScreen = ({ navigation, route }: Props) => {
+export const TicketScannerScreen = ({events}:{events: EventModel[]}) => {
+  const router = useRouter()
   const redemptionLogRef = useRef<RedemptionLogSheet>(null);
   const multiScanErrorRef = useRef<MultiScanErrorSheet>(null);
-  const { events } = route.params!;
   // variables
   const [lastScan, setLastScan] = useState();
   const handleOpenPress = () => {
@@ -122,7 +116,7 @@ export const TicketScannerScreen = ({ navigation, route }: Props) => {
 
   useEffect(() => {
     if (!events) {
-      navigation.navigate('AdminEventSelector');
+      router.navigate('AdminEventSelector');
     }
   }, [events]);
   const isFocused = useIsFocused();
@@ -136,7 +130,7 @@ export const TicketScannerScreen = ({ navigation, route }: Props) => {
     if (code.rawValue) {
       let ticketNumbers: string | string[] = code.rawValue || '';
       if (ticketNumbers.includes('|')) {
-        ticketNumbers = ticketNumbers.split('|');
+        ticketNumbers = (ticketNumbers as string).split('|');
       }
       try {
         const results = await redeemTicket(ticketNumbers);
@@ -177,12 +171,12 @@ export const TicketScannerScreen = ({ navigation, route }: Props) => {
       <>
         <Box
           marginVertical="m">
-          <Text variant="header" textAlign="center">
+          <TextView variant="header" textAlign="center">
             {titleText}
-          </Text>
-          <Text marginTop="m" textAlign="center">
+          </TextView>
+          <TextView marginTop="m" textAlign="center">
             {eventDate}
-          </Text>
+          </TextView>
         </Box>
         <Box flex={1} backgroundColor="bodyText">
           <QRScanner
@@ -198,7 +192,7 @@ export const TicketScannerScreen = ({ navigation, route }: Props) => {
             <Button
               label="Customer Check-In"
               variant="primary"
-              onPress={() => navigation.navigate('EventTicketList', {events: events})}
+              onPress={() => router.navigate('EventTicketList', {events: events})}
             />
             <Button label="View Previous Scans" onPress={handleOpenPress} />
           </Box>
@@ -208,15 +202,11 @@ export const TicketScannerScreen = ({ navigation, route }: Props) => {
   };
   return (
     <BottomSheetModalProvider>
-      <MainLayout
-        showHeader
-        headerOptions={{
-          onBackPress: () => navigation.navigate('AdminEventSelector'),
-        }}>
+      
         <Box flex={1}>{renderContent()}</Box>
         <RedemptionLogBottomSheet ref={redemptionLogRef} events={events} />
         <MultiScanErrorBottomSheet ref={multiScanErrorRef} />
-      </MainLayout>
+      
     </BottomSheetModalProvider>
   );
 };
